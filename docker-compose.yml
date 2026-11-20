@@ -1,0 +1,99 @@
+name: clouddevops
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: clouddevops-frontend:latest
+    container_name: clouddevops-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      AUTH_SERVICE_URL: http://clouddevops-auth:5000
+      ROADMAP_SERVICE_URL: http://clouddevops-roadmap:8080
+      SESSION_SECRET: ${SESSION_SECRET}
+    depends_on:
+      auth:
+        condition: service_healthy
+      roadmap:
+        condition: service_healthy
+    networks:
+      - clouddevops-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  auth:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    image: clouddevops-auth:latest
+    container_name: clouddevops-auth
+    environment:
+      DB_HOST: clouddevops-mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - clouddevops-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  roadmap:
+    build:
+      context: ./roadmap-service
+      dockerfile: Dockerfile
+    image: clouddevops-roadmap:latest
+    container_name: clouddevops-roadmap
+    networks:
+      - clouddevops-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+      start_period: 60s
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    container_name: clouddevops-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - clouddevops-mysql-data:/var/lib/mysql
+    networks:
+      - clouddevops-net
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  clouddevops-net:
+    name: clouddevops-net
+    driver: bridge
+
+volumes:
+  clouddevops-mysql-data:
+    name: clouddevops-mysql-data
