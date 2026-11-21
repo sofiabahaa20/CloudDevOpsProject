@@ -26,3 +26,9 @@ target/
 .DS_Store
 opencode.json
 ProjectTasks.pdf
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
