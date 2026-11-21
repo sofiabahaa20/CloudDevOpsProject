@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: roadmap
+  namespace: ivolve
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: roadmap
+  template:
+    metadata:
+      labels:
+        app: roadmap
+    spec:
+      containers:
+        - name: roadmap
+          image: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/clouddevops-roadmap:latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: roadmap
+  namespace: ivolve
+spec:
+  selector:
+    app: roadmap
+  ports:
+    - port: 8080
+      targetPort: 8080
